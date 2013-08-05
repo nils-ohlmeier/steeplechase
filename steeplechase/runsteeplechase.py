@@ -35,7 +35,7 @@ class HTMLTest(object):
         self.test_file = os.path.abspath(test_file)
         self.remote_app_path = remote_app_path
         #XXX: start httpd in main, not here
-        self.httpd = MozHttpd(docroot=os.path.dirname(self.test_file))
+        self.httpd = MozHttpd(host="192.168.197.1", docroot=os.path.dirname(self.test_file))
 
     def run(self):
         self.httpd.start(block=False)
@@ -45,7 +45,7 @@ class HTMLTest(object):
                            options='primary,privileged')
 
         #TODO: use Preferences.read when prefs_general.js has been updated
-        prefpath = "/build/mozilla-central/testing/profiles/prefs_general.js"
+        prefpath = "/Users/luser" + "/build/mozilla-central/testing/profiles/prefs_general.js"
         prefs = {}
         prefs.update(Preferences.read_prefs(prefpath))
         interpolation = { "server": "%s:%d" % self.httpd.httpd.server_address,
@@ -54,7 +54,7 @@ class HTMLTest(object):
         for pref in prefs:
           prefs[pref] = Preferences.cast(prefs[pref])
 
-        specialpowers_path = "/build/debug-mozilla-central/dist/xpi-stage/specialpowers"
+        specialpowers_path = "/Users/luser" + "/build/debug-mozilla-central/dist/xpi-stage/specialpowers"
         with mozfile.TemporaryDirectory() as profile_path:
             # Create and push profile
             profile = FirefoxProfile(profile=profile_path,
@@ -68,12 +68,13 @@ class HTMLTest(object):
             env = {}
             env["MOZ_CRASHREPORTER_NO_REPORT"] = "1"
             env["XPCOM_DEBUG_BREAK"] = "warn"
+            env["DISPLAY"] = ":1"
 
             cmd = [self.remote_app_path, "-no-remote",
                    "-profile", remote_profile_path,
                    self.httpd.get_url("/" + os.path.basename(self.test_file))]
             print "cmd: %s" % (cmd, )
-            output = self.dm.shellCheckOutput(" ".join(cmd),
+            output = self.dm.shellCheckOutput(cmd,
                                               env = env)
             self.httpd.stop()
         return True
@@ -86,13 +87,15 @@ def main(args):
         return 2
 
     log = mozlog.getLogger('steeplechase')
-    dm = DeviceManagerSUT("localhost")
+    log.setLevel(mozlog.DEBUG)
+    dm = DeviceManagerSUT("192.168.197.130")
     # first, push app
     test_root = dm.getDeviceRoot() + "/steeplechase"
     if dm.dirExists(test_root):
         dm.removeDir(test_root)
     dm.mkDir(test_root)
-    app_path = "/build/debug-mozilla-central/dist/firefox/firefox"
+    app_path = "/tmp/firefox/firefox"
+    #"/build/debug-mozilla-central/dist/firefox/firefox"
     remote_app_dir = test_root + "/app"
     dm.mkDir(remote_app_dir)
     dm.pushDir(os.path.dirname(app_path), remote_app_dir)
