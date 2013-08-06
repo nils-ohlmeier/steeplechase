@@ -16,6 +16,7 @@ version = "1.0"
 dependencies = ['mozhttpd',
                 'mozfile',
                 'mozlog',
+                'moznetwork',
                 'mozprofile',
                 'mozprocess',
                 'mozrunner',

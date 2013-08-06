@@ -11,6 +11,7 @@ from mozhttpd import MozHttpd
 import json
 import mozfile
 import mozlog
+import moznetwork
 import os
 import sys
 
@@ -21,10 +22,18 @@ class Options(OptionParser):
                 Usage instructions for runsteeplechase.py.
                 %prog [options] test <test>*
                 """
-        #app path
-        #extension path
-        #prefs path
-        #remote host IP, port
+        self.add_option("--binary",
+                        action="store", type="string", dest="binary",
+                        help="path to application (required)")
+        self.add_option("--specialpowers-path",
+                        action="store", type="string", dest="specialpowers",
+                        help="path to specialpowers extension (required)")
+        self.add_option("--prefs-file",
+                        action="store", type="string", dest="prefs",
+                        help="path to testing preferences file")
+        self.add_option("--host",
+                        action="store", type="string", dest="host",
+                        help="remote host to run tests on")
 
         self.set_usage(usage)
 
@@ -35,7 +44,8 @@ class HTMLTest(object):
         self.test_file = os.path.abspath(test_file)
         self.remote_app_path = remote_app_path
         #XXX: start httpd in main, not here
-        self.httpd = MozHttpd(host="192.168.197.1", docroot=os.path.dirname(self.test_file))
+        self.httpd = MozHttpd(host=moznetwork.get_ip(),
+                              docroot=os.path.dirname(self.test_file))
 
     def run(self):
         self.httpd.start(block=False)
@@ -82,20 +92,29 @@ class HTMLTest(object):
 def main(args):
     parser = Options()
     options, args = parser.parse_args()
-    if not args:
+    if not args or not options.binary or not options.specialpowers or not options.host:
         parser.print_usage()
+        return 2
+
+    if not os.path.isfile(options.binary):
+        parser.error("Binary %s does not exist" % options.binary)
+        return 2
+    if not os.path.isdir(options.specialpowers):
+        parser.error("SpecialPowers direcotry %s does not exist" % options.specialpowers)
+        return 2
+    if options.prefs and not os.path.isfile(options.prefs):
+        parser.error("Prefs file %s does not exist" % options.prefs)
         return 2
 
     log = mozlog.getLogger('steeplechase')
     log.setLevel(mozlog.DEBUG)
-    dm = DeviceManagerSUT("192.168.197.130")
+    dm = DeviceManagerSUT(options.host)
     # first, push app
     test_root = dm.getDeviceRoot() + "/steeplechase"
     if dm.dirExists(test_root):
         dm.removeDir(test_root)
     dm.mkDir(test_root)
-    app_path = "/tmp/firefox/firefox"
-    #"/build/debug-mozilla-central/dist/firefox/firefox"
+    app_path = options.binary
     remote_app_dir = test_root + "/app"
     dm.mkDir(remote_app_dir)
     dm.pushDir(os.path.dirname(app_path), remote_app_dir)
