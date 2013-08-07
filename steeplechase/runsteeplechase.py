@@ -60,9 +60,10 @@ class RunThread(threading.Thread):
             del self.args
 
 class HTMLTest(object):
-    def __init__(self, remote_info, test_file):
-        self.remote_info = remote_info
+    def __init__(self, test_file, remote_info, options):
         self.test_file = os.path.abspath(test_file)
+        self.remote_info = remote_info
+        self.options = options
         #XXX: start httpd in main, not here
         self.httpd = MozHttpd(host=moznetwork.get_ip(),
                               docroot=os.path.dirname(self.test_file))
@@ -75,7 +76,7 @@ class HTMLTest(object):
                            options='primary,privileged')
 
         #TODO: use Preferences.read when prefs_general.js has been updated
-        prefpath = "/Users/luser" + "/build/mozilla-central/testing/profiles/prefs_general.js"
+        prefpath = self.options.prefs
         prefs = {}
         prefs.update(Preferences.read_prefs(prefpath))
         interpolation = { "server": "%s:%d" % self.httpd.httpd.server_address,
@@ -84,7 +85,7 @@ class HTMLTest(object):
         for pref in prefs:
           prefs[pref] = Preferences.cast(prefs[pref])
 
-        specialpowers_path = "/Users/luser" + "/build/debug-mozilla-central/dist/xpi-stage/specialpowers"
+        specialpowers_path = self.options.specialpowers
         with mozfile.TemporaryDirectory() as profile_path:
             # Create and push profile
             print "Writing profile..."
@@ -168,7 +169,7 @@ def main(args):
     for arg in args:
         test = None
         if arg.endswith(".html"):
-            test = HTMLTest(remote_info, arg)
+            test = HTMLTest(arg, remote_info, options)
         else:
             #TODO: support C++ tests
             log.error("Unknown test type: %s", arg)
