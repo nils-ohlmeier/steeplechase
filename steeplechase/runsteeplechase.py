@@ -7,6 +7,7 @@ from optparse import OptionParser
 from mozprofile import FirefoxProfile, Profile, Preferences
 from mozprofile.permissions import ServerLocations
 from mozhttpd import MozHttpd
+from Queue import Queue
 
 import json
 import mozfile
@@ -14,6 +15,7 @@ import mozlog
 import moznetwork
 import os
 import sys
+import threading
 
 class Options(OptionParser):
     def __init__(self, **kwargs):
@@ -31,18 +33,36 @@ class Options(OptionParser):
         self.add_option("--prefs-file",
                         action="store", type="string", dest="prefs",
                         help="path to testing preferences file")
-        self.add_option("--host",
-                        action="store", type="string", dest="host",
-                        help="remote host to run tests on")
+        self.add_option("--host1",
+                        action="store", type="string", dest="host1",
+                        help="first remote host to run tests on")
+        self.add_option("--host2",
+                        action="store", type="string", dest="host2",
+                        help="first remote host to run tests on")
 
         self.set_usage(usage)
 
+class RunThread(threading.Thread):
+    def __init__(self, args=(), **kwargs):
+        threading.Thread.__init__(self, args=args, **kwargs)
+        self.args = args
+
+    def run(self):
+        dm, cmd, env, cond, results = self.args
+        try:
+            output = dm.shellCheckOutput(cmd, env=env)
+        finally:
+            #TODO: actual result
+            cond.acquire()
+            results.append((self, 0))
+            cond.notify()
+            cond.release()
+            del self.args
+
 class HTMLTest(object):
-    def __init__(self, dm, test_file, test_root, remote_app_path):
-        self.dm = dm
-        self.test_root = test_root
+    def __init__(self, remote_info, test_file):
+        self.remote_info = remote_info
         self.test_file = os.path.abspath(test_file)
-        self.remote_app_path = remote_app_path
         #XXX: start httpd in main, not here
         self.httpd = MozHttpd(host=moznetwork.get_ip(),
                               docroot=os.path.dirname(self.test_file))
@@ -67,32 +87,51 @@ class HTMLTest(object):
         specialpowers_path = "/Users/luser" + "/build/debug-mozilla-central/dist/xpi-stage/specialpowers"
         with mozfile.TemporaryDirectory() as profile_path:
             # Create and push profile
+            print "Writing profile..."
             profile = FirefoxProfile(profile=profile_path,
                                      preferences=prefs,
                                      addons=[specialpowers_path],
                                      locations=locations)
-            remote_profile_path = os.path.join(self.test_root, "profile")
-            self.dm.mkDir(remote_profile_path)
-            self.dm.pushDir(profile_path, remote_profile_path)
+            for info in self.remote_info:
+                print "Pushing profile..."
+                remote_profile_path = os.path.join(info['test_root'], "profile")
+                info['dm'].mkDir(remote_profile_path)
+                info['dm'].pushDir(profile_path, remote_profile_path)
+                info['remote_profile_path'] = remote_profile_path
 
             env = {}
             env["MOZ_CRASHREPORTER_NO_REPORT"] = "1"
             env["XPCOM_DEBUG_BREAK"] = "warn"
             env["DISPLAY"] = ":1"
 
-            cmd = [self.remote_app_path, "-no-remote",
-                   "-profile", remote_profile_path,
-                   self.httpd.get_url("/" + os.path.basename(self.test_file))]
-            print "cmd: %s" % (cmd, )
-            output = self.dm.shellCheckOutput(cmd,
-                                              env = env)
+            threads = []
+            results = []
+            cond = threading.Condition()
+            for info in self.remote_info:
+                cmd = [info['remote_app_path'], "-no-remote",
+                       "-profile", info['remote_profile_path'],
+                       self.httpd.get_url("/" + os.path.basename(self.test_file))]
+                print "cmd: %s" % (cmd, )
+                t = RunThread(args=(info['dm'], cmd, env, cond, results))
+                t.start()
+                threads.append(t)
+            print "Waiting for results..."
+            while threads:
+                cond.acquire()
+                while not results:
+                    cond.wait()
+                res = results.pop(0)
+                cond.release()
+                print "Got result: %d" % res[1]
+                threads.remove(res[0])
+            print "Done!"
             self.httpd.stop()
         return True
 
 def main(args):
     parser = Options()
     options, args = parser.parse_args()
-    if not args or not options.binary or not options.specialpowers or not options.host:
+    if not args or not options.binary or not options.specialpowers or not options.host1 or not options.host2:
         parser.print_usage()
         return 2
 
@@ -108,23 +147,28 @@ def main(args):
 
     log = mozlog.getLogger('steeplechase')
     log.setLevel(mozlog.DEBUG)
-    dm = DeviceManagerSUT(options.host)
+    dm1 = DeviceManagerSUT(options.host1)
+    dm2 = DeviceManagerSUT(options.host2)
+    remote_info = [{'dm': dm1}, {'dm': dm2}]
     # first, push app
-    test_root = dm.getDeviceRoot() + "/steeplechase"
-    if dm.dirExists(test_root):
-        dm.removeDir(test_root)
-    dm.mkDir(test_root)
-    app_path = options.binary
-    remote_app_dir = test_root + "/app"
-    dm.mkDir(remote_app_dir)
-    dm.pushDir(os.path.dirname(app_path), remote_app_dir)
-    remote_app_path = remote_app_dir + "/" + os.path.basename(app_path)
+    for info in remote_info:
+        dm = info['dm']
+        test_root = dm.getDeviceRoot() + "/steeplechase"
+        if dm.dirExists(test_root):
+            dm.removeDir(test_root)
+        dm.mkDir(test_root)
+        info['test_root'] = test_root
+        app_path = options.binary
+        remote_app_dir = test_root + "/app"
+        dm.mkDir(remote_app_dir)
+        dm.pushDir(os.path.dirname(app_path), remote_app_dir)
+        info['remote_app_path'] = remote_app_dir + "/" + os.path.basename(app_path)
 
     result = True
     for arg in args:
         test = None
         if arg.endswith(".html"):
-            test = HTMLTest(dm, arg, test_root, remote_app_path)
+            test = HTMLTest(remote_info, arg)
         else:
             #TODO: support C++ tests
             log.error("Unknown test type: %s", arg)
