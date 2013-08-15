@@ -38,7 +38,10 @@ class Options(OptionParser):
                         help="first remote host to run tests on")
         self.add_option("--host2",
                         action="store", type="string", dest="host2",
-                        help="first remote host to run tests on")
+                        help="second remote host to run tests on")
+        self.add_option("--remote-webserver",
+                        action="store", type="string", dest="remote_webserver",
+                        help="ip address to use for webserver")
 
         self.set_usage(usage)
 
@@ -65,13 +68,18 @@ class HTMLTest(object):
         self.remote_info = remote_info
         self.options = options
         #XXX: start httpd in main, not here
-        self.httpd = MozHttpd(host=moznetwork.get_ip(),
+        self.httpd = MozHttpd(host=moznetwork.get_ip(), port=8888,
                               docroot=os.path.dirname(self.test_file))
 
     def run(self):
         self.httpd.start(block=False)
         locations = ServerLocations()
-        locations.add_host(host=self.httpd.host,
+        if self.options.remote_webserver:
+            httpd_host = self.options.remote_webserver
+        else:
+            httpd_host = self.httpd.host
+
+        locations.add_host(host=httpd_host,
                            port=self.httpd.port,
                            options='primary,privileged')
 
@@ -103,7 +111,7 @@ class HTMLTest(object):
             env = {}
             env["MOZ_CRASHREPORTER_NO_REPORT"] = "1"
             env["XPCOM_DEBUG_BREAK"] = "warn"
-            env["DISPLAY"] = ":1"
+            env["DISPLAY"] = ":0"
 
             threads = []
             results = []
@@ -111,7 +119,7 @@ class HTMLTest(object):
             for info in self.remote_info:
                 cmd = [info['remote_app_path'], "-no-remote",
                        "-profile", info['remote_profile_path'],
-                       self.httpd.get_url("/" + os.path.basename(self.test_file))]
+                       'http://%s:%d/%s' % (httpd_host, self.httpd.port, os.path.basename(self.test_file))]
                 print "cmd: %s" % (cmd, )
                 t = RunThread(args=(info['dm'], cmd, env, cond, results))
                 t.start()
