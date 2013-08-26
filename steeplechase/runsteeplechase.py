@@ -14,6 +14,7 @@ import mozfile
 import mozlog
 import moznetwork
 import os
+import re
 import sys
 import threading
 
@@ -41,7 +42,10 @@ class Options(OptionParser):
                         help="second remote host to run tests on")
         self.add_option("--remote-webserver",
                         action="store", type="string", dest="remote_webserver",
-                        help="ip address to use for webserver")
+                        help="ip address to use for webserver"),
+        self.add_option("--x-display",
+                        action="store", type="string", dest="remote_xdisplay",
+                        default=":0", help="x display to use on remote system")
 
         self.set_usage(usage)
 
@@ -68,14 +72,18 @@ class HTMLTest(object):
         self.remote_info = remote_info
         self.options = options
         #XXX: start httpd in main, not here
-        self.httpd = MozHttpd(host=moznetwork.get_ip(), port=8888,
+        remote_port = None
+        result = re.search(':(\d+)', self.options.remote_webserver)
+        if result:
+            remote_port = int(result.groups()[0])
+        self.httpd = MozHttpd(host=moznetwork.get_ip(), port=remote_port,
                               docroot=os.path.dirname(self.test_file))
 
     def run(self):
         self.httpd.start(block=False)
         locations = ServerLocations()
         if self.options.remote_webserver:
-            httpd_host = self.options.remote_webserver
+            httpd_host = self.options.remote_webserver.split(':')[0]
         else:
             httpd_host = self.httpd.host
 
@@ -111,7 +119,7 @@ class HTMLTest(object):
             env = {}
             env["MOZ_CRASHREPORTER_NO_REPORT"] = "1"
             env["XPCOM_DEBUG_BREAK"] = "warn"
-            env["DISPLAY"] = ":0"
+            env["DISPLAY"] = self.options.remote_xdisplay
 
             threads = []
             results = []
