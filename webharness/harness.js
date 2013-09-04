@@ -153,7 +153,7 @@ function run_next_test() {
         harness_error(new Error("Wrong test loaded on other side: " + m.test));
         return;
       }
-      current_window.test(is_initiator);
+      current_window.run_test(is_initiator);
     });
   });
   //TODO: timeout handling

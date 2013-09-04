@@ -4,7 +4,7 @@
 <title>sample test</title>
 <script src="/test.js"></script>
 <script>
-function test(is_initiator) {
+function run_test(is_initiator) {
   ok(true, "sample test started");
   if (is_initiator) {
     send_message({"data": "sample data"});
