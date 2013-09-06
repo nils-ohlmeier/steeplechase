@@ -14,6 +14,7 @@ import mozfile
 import mozlog
 import moznetwork
 import os
+import re
 import sys
 import threading
 import uuid
@@ -42,11 +43,17 @@ class Options(OptionParser):
                         help="first remote host to run tests on")
         self.add_option("--signalling-server",
                         action="store", type="string", dest="signalling_server",
-                        help="signalling server URL to use for tests");
+                        help="signalling server URL to use for tests")
         self.add_option("--noSetup",
                         action="store_false", dest="setup",
                         default="True",
-                        help="do not copy files to device");
+                        help="do not copy files to device")
+        self.add_option("--remote-webserver",
+                        action="store", type="string", dest="remote_webserver",
+                        help="ip address to use for webserver")
+        self.add_option("--x-display",
+                        action="store", type="string", dest="remote_xdisplay",
+                        default=":0", help="x display to use on remote system")
 
         self.set_usage(usage)
 
@@ -75,8 +82,13 @@ class HTMLTests(object):
         self.httpd = httpd
 
     def run(self):
+        if self.options.remote_webserver:
+            httpd_host = self.options.remote_webserver.split(':')[0]
+        else:
+            httpd_host = self.httpd.host
+
         locations = ServerLocations()
-        locations.add_host(host=self.httpd.host,
+        locations.add_host(host=httpd_host,
                            port=self.httpd.port,
                            options='primary,privileged')
 
@@ -84,7 +96,7 @@ class HTMLTests(object):
         prefpath = self.options.prefs
         prefs = {}
         prefs.update(Preferences.read_prefs(prefpath))
-        interpolation = { "server": "%s:%d" % self.httpd.httpd.server_address,
+        interpolation = { "server": "%s:%d" % (httpd_host, self.httpd.port),
                           "OOP": "false"}
         prefs = json.loads(json.dumps(prefs) % interpolation)
         for pref in prefs:
@@ -115,11 +127,11 @@ class HTMLTests(object):
             env = {}
             env["MOZ_CRASHREPORTER_NO_REPORT"] = "1"
             env["XPCOM_DEBUG_BREAK"] = "warn"
-            env["DISPLAY"] = ":0"
+            env["DISPLAY"] = self.options.remote_xdisplay
 
             cmd = [info['remote_app_path'], "-no-remote",
                    "-profile", info['remote_profile_path'],
-                   self.httpd.get_url("/index.html")]
+                   'http://%s:%d/index.html' % (httpd_host, self.httpd.port)]
             print "cmd: %s" % (cmd, )
             t = RunThread(args=(info['dm'], cmd, env, cond, results))
             threads.append(t)
@@ -180,7 +192,11 @@ def main(args):
 
     result = True
     #TODO: only start httpd if we have HTML tests
-    httpd = MozHttpd(host=moznetwork.get_ip(),
+    remote_port = None
+    result = re.search(':(\d+)', options.remote_webserver)
+    if result:
+        remote_port = int(result.groups()[0])
+    httpd = MozHttpd(host=moznetwork.get_ip(), port=remote_port, log_requests=True,
                      docroot=os.path.join(os.path.dirname(__file__), "..", "webharness"))
     httpd.start(block=False)
     #TODO: support test manifests
