@@ -1,9 +1,10 @@
-var log = window.opener.log_result;
+var log_result = window.opener.log_result;
+var info = window.opener.log;
 var pass_count = 0;
 var fail_count = 0;
 
 function ok(condition, message) {
-  log(!!condition, message);
+  log_result(!!condition, message);
 }
 
 function is(a, b, message) {

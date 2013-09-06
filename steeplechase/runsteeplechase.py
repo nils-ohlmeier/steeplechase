@@ -91,6 +91,7 @@ class HTMLTests(object):
           prefs[pref] = Preferences.cast(prefs[pref])
         prefs["steeplechase.signalling_server"] = self.options.signalling_server
         prefs["steeplechase.signalling_room"] = str(uuid.uuid4())
+        prefs["media.navigator.permission.disabled"] = True
 
         specialpowers_path = self.options.specialpowers
         threads = []

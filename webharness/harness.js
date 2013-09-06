@@ -174,9 +174,14 @@ function finish() {
   SpecialPowers.quit();
 }
 
+function log(message, test, extra) {
+  //TODO: make this structured?
+  dump(message + "\n");
+}
+
 function log_result(result, message, test) {
   var output = {'action': result ? "test_pass" : "test_unexpected_fail",
-                'diagnostic': message,
+                'message': message,
                 'time': Date.now(),
                 'source_file': test || tests[current_test].path};
   dump(JSON.stringify(output) + "\n");
