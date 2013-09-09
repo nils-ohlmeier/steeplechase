@@ -5,6 +5,8 @@ var socket;
 var socket_messages = [];
 var socket_message_deferreds = [];
 var is_initiator = SpecialPowers.getBoolPref("steeplechase.is_initiator");
+var total_passed = 0;
+var total_failed = 0;
 
 function fetch_manifest() {
   var deferred = Q.defer();
@@ -154,6 +156,7 @@ function run_next_test() {
         return;
       }
       current_window.run_test(is_initiator);
+      ++total_passed;
     });
   });
   //TODO: timeout handling
@@ -171,6 +174,9 @@ function test_finished() {
 }
 
 function finish() {
+  dump('Result summary\n');
+  dump('Passed: ' + total_passed.toString() + '\n');
+  dump('Failed: ' + total_failed.toString() + '\n');
   SpecialPowers.quit();
 }
 
