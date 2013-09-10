@@ -86,17 +86,18 @@ class HTMLTests(object):
             httpd_host = self.options.remote_webserver.split(':')[0]
         else:
             httpd_host = self.httpd.host
+        httpd_port = self.httpd.httpd.server_port
 
         locations = ServerLocations()
         locations.add_host(host=httpd_host,
-                           port=self.httpd.port,
+                           port=httpd_port,
                            options='primary,privileged')
 
         #TODO: use Preferences.read when prefs_general.js has been updated
         prefpath = self.options.prefs
         prefs = {}
         prefs.update(Preferences.read_prefs(prefpath))
-        interpolation = { "server": "%s:%d" % (httpd_host, self.httpd.port),
+        interpolation = { "server": "%s:%d" % (httpd_host, httpd_port),
                           "OOP": "false"}
         prefs = json.loads(json.dumps(prefs) % interpolation)
         for pref in prefs:
@@ -131,7 +132,7 @@ class HTMLTests(object):
 
             cmd = [info['remote_app_path'], "-no-remote",
                    "-profile", info['remote_profile_path'],
-                   'http://%s:%d/index.html' % (httpd_host, self.httpd.port)]
+                   'http://%s:%d/index.html' % (httpd_host, httpd_port)]
             print "cmd: %s" % (cmd, )
             t = RunThread(args=(info['dm'], cmd, env, cond, results))
             threads.append(t)
@@ -192,10 +193,11 @@ def main(args):
 
     result = True
     #TODO: only start httpd if we have HTML tests
-    remote_port = None
-    result = re.search(':(\d+)', options.remote_webserver)
-    if result:
-        remote_port = int(result.groups()[0])
+    remote_port = 0
+    if options.remote_webserver:
+        result = re.search(':(\d+)', options.remote_webserver)
+        if result:
+            remote_port = int(result.groups()[0])
     httpd = MozHttpd(host=moznetwork.get_ip(), port=remote_port, log_requests=True,
                      docroot=os.path.join(os.path.dirname(__file__), "..", "webharness"))
     httpd.start(block=False)
