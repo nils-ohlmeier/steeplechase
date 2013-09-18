@@ -57,27 +57,46 @@ class Options(OptionParser):
 
         self.set_usage(usage)
 
+def get_results(output):
+    """Count test passes/failures in output.
+    Return (passes, failures)."""
+    passes, failures = 0, 0
+    for line_string in output.splitlines():
+        try:
+            line_object = json.loads(line_string)
+            if not isinstance(line_object, dict):
+                continue
+            if line_object["action"] == "test_unexpected_fail":
+                failures += 1
+            elif line_object["action"] == "test_pass":
+                passes += 1
+        except ValueError:
+            pass
+    return passes, failures
+
 class RunThread(threading.Thread):
     def __init__(self, args=(), **kwargs):
         threading.Thread.__init__(self, args=args, **kwargs)
+        self.name = kwargs.get("name", "Thread")
         self.args = args
 
     def run(self):
         dm, cmd, env, cond, results = self.args
         try:
             output = dm.shellCheckOutput(cmd, env=env)
-            print "%s\n%s\n%s" % ("=" * 20, output, "=" * 20)
+            result = get_results(output)
         finally:
             #TODO: actual result
             cond.acquire()
-            results.append((self, 0))
+            results.append((self, result, output))
             cond.notify()
             cond.release()
             del self.args
 
 class HTMLTests(object):
-    def __init__(self, httpd, remote_info, options):
+    def __init__(self, httpd, remote_info, log, options):
         self.remote_info = remote_info
+        self.log = log
         self.options = options
         self.httpd = httpd
 
@@ -134,23 +153,40 @@ class HTMLTests(object):
                    "-profile", info['remote_profile_path'],
                    'http://%s:%d/index.html' % (httpd_host, httpd_port)]
             print "cmd: %s" % (cmd, )
-            t = RunThread(args=(info['dm'], cmd, env, cond, results))
+            t = RunThread(name=info['name'],
+                          args=(info['dm'], cmd, env, cond, results))
             threads.append(t)
 
         for t in threads:
             t.start()
 
-        print "Waiting for results..."
+        self.log.info("Waiting for results...")
+        pass_count, fail_count = 0, 0
+        outputs = {}
         while threads:
             cond.acquire()
             while not results:
                 cond.wait()
-            res = results.pop(0)
+            thread, result, output = results.pop(0)
             cond.release()
-            print "Got result: %d" % res[1]
-            threads.remove(res[0])
-        print "Done!"
-        return True
+            outputs[thread.name] = output
+            passes, failures = result
+            #XXX: double-counting tests from both clients. Ok?
+            pass_count += passes
+            fail_count += failures
+            if failures:
+                self.log.error("Error in %s" % thread.name)
+            threads.remove(thread)
+        self.log.info("All clients finished")
+        if fail_count:
+            for info in self.remote_info:
+                self.log.info("Log output for %s:", info["name"])
+                self.log.info(">>>>>>>")
+                for line in outputs[info['name']].splitlines():
+                    #TODO: make structured log messages human-readable
+                    self.log.info(line)
+                self.log.info("<<<<<<<")
+        return pass_count, fail_count
 
 def main(args):
     parser = Options()
@@ -173,8 +209,8 @@ def main(args):
     log.setLevel(mozlog.DEBUG)
     dm1 = DeviceManagerSUT(options.host1)
     dm2 = DeviceManagerSUT(options.host2)
-    remote_info = [{'dm': dm1, 'is_initiator': True},
-                   {'dm': dm2, 'is_initiator': False}]
+    remote_info = [{'dm': dm1, 'is_initiator': True, 'name': 'Client 1'},
+                   {'dm': dm2, 'is_initiator': False, 'name': 'Client 2'}]
     # first, push app
     for info in remote_info:
         dm = info['dm']
@@ -202,10 +238,13 @@ def main(args):
                      docroot=os.path.join(os.path.dirname(__file__), "..", "webharness"))
     httpd.start(block=False)
     #TODO: support test manifests
-    test = HTMLTests(httpd, remote_info, options)
-    result = test.run()
+    test = HTMLTests(httpd, remote_info, log, options)
+    pass_count, fail_count = test.run()
     httpd.stop()
-    return 0 if result else 1
+    log.info("Result summary:")
+    log.info("Passed: %d" % pass_count)
+    log.info("Failed: %d" % fail_count)
+    return fail_count == 0
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

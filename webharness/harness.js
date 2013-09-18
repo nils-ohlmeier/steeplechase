@@ -5,8 +5,6 @@ var socket;
 var socket_messages = [];
 var socket_message_deferreds = [];
 var is_initiator = SpecialPowers.getBoolPref("steeplechase.is_initiator");
-var total_passed = 0;
-var total_failed = 0;
 
 function fetch_manifest() {
   var deferred = Q.defer();
@@ -140,10 +138,11 @@ function run_next_test() {
     return;
   }
 
-  current_window = window.open("/tests/" + tests[current_test].path);
+  var path = tests[current_test].path;
+  current_window = window.open("/tests/" + path);
   current_window.addEventListener("load", function() {
     dump("loaded\n");
-    send_message({"action": "test_loaded", "test": tests[current_test].path});
+    send_message({"action": "test_loaded", "test": path});
     // Wait for other side to have loaded this test.
     wait_for_message().then(function (m) {
       if (m.action != "test_loaded") {
@@ -151,12 +150,11 @@ function run_next_test() {
         harness_error(new Error("Looking for test_loaded, got: " + JSON.stringify(m)));
         return;
       }
-      if (m.test != tests[current_test].path) {
+      if (m.test != path) {
         harness_error(new Error("Wrong test loaded on other side: " + m.test));
         return;
       }
       current_window.run_test(is_initiator);
-      ++total_passed;
     });
   });
   //TODO: timeout handling
@@ -170,13 +168,12 @@ function harness_error(error) {
 
 // Called by tests via test.js.
 function test_finished() {
+  current_window.close();
+  current_window = null;
   run_next_test();
 }
 
 function finish() {
-  dump('Result summary\n');
-  dump('Passed: ' + total_passed.toString() + '\n');
-  dump('Failed: ' + total_failed.toString() + '\n');
   SpecialPowers.quit();
 }
 
