@@ -247,4 +247,4 @@ def main(args):
     return fail_count == 0
 
 if __name__ == '__main__':
-    sys.exit(int(main(sys.argv[1:])))
+    sys.exit(0 if main(sys.argv[1:]) else 1)
