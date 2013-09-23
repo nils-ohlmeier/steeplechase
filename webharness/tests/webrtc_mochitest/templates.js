@@ -41,7 +41,8 @@ var commandsPeerConnection = [
         is(test.pcLocal.signalingState, "stable",
            "Local create offer does not change signaling state");
         if (!test.pcRemote) {
-          send_message({"offer": test.pcLocal._last_offer});
+          send_message({"offer": test.pcLocal._last_offer,
+                        "media_constraints": test.pcLocal.constraints});
         }
         test.next();
       });
@@ -62,11 +63,13 @@ var commandsPeerConnection = [
     function (test) {
       if (test.pcLocal) {
         test._local_offer = test.pcLocal._last_offer;
+        test._local_constraints = test.pcLocal.constraints;
         test.next();
       } else {
         wait_for_message().then(function(message) {
           ok("offer" in message, "Got an offer message");
           test._local_offer = new mozRTCSessionDescription(message.offer);
+          test._local_constraints = message.media_constraints;
           test.next();
         });
       }
@@ -89,7 +92,8 @@ var commandsPeerConnection = [
         is(test.pcRemote.signalingState, "have-remote-offer",
            "Remote createAnswer does not change signaling state");
         if (!test.pcLocal) {
-          send_message({"answer": test.pcRemote._last_answer});
+          send_message({"answer": test.pcRemote._last_answer,
+                        "media_constraints": test.pcRemote.constraints});
         }
         test.next();
       });
@@ -100,11 +104,13 @@ var commandsPeerConnection = [
     function (test) {
       if (test.pcRemote) {
         test._remote_answer = test.pcRemote._last_answer;
+        test._remote_constraints = test.pcRemote.constraints;
         test.next();
       } else {
         wait_for_message().then(function(message) {
           ok("answer" in message, "Got an answer message");
           test._remote_answer = new mozRTCSessionDescription(message.answer);
+          test._remote_constraints = message.media_constraints;
           test.next();
         });
       }
@@ -133,19 +139,14 @@ var commandsPeerConnection = [
   [
     'PC_LOCAL_CHECK_MEDIA_STREAMS',
     function (test) {
-      if (test.pcRemote) {
-        //TODO: check this with steeplechase?
-        test.pcLocal.checkMediaStreams(test.pcRemote.constraints);
-      }
+      test.pcLocal.checkMediaStreams(test._remote_constraints);
       test.next();
     }
   ],
   [
     'PC_REMOTE_CHECK_MEDIA_STREAMS',
     function (test) {
-      if (test.pcLocal) {
-        test.pcRemote.checkMediaStreams(test.pcLocal.constraints);
-      }
+      test.pcRemote.checkMediaStreams(test._local_constraints);
       test.next();
     }
   ],
