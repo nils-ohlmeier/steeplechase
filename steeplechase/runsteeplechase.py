@@ -7,6 +7,7 @@ from optparse import OptionParser
 from mozprofile import FirefoxProfile, Profile, Preferences
 from mozprofile.permissions import ServerLocations
 from mozhttpd import MozHttpd
+from mozhttpd.handlers import json_response
 from Queue import Queue
 
 import json
@@ -234,8 +235,23 @@ def main(args):
         result = re.search(':(\d+)', options.remote_webserver)
         if result:
             remote_port = int(result.groups()[0])
+
+    @json_response
+    def get_manifest(req):
+        #TODO: parse manifest, use contents here
+        return (200,
+                {"tests": [
+                    {"path": "sample.html"},
+                    {"path": "webrtc_mochitest/test_peerConnection_basicAudio.html"}
+                    ]})
+    handlers = [{
+        'method': 'GET',
+        'path': '/manifest.json',
+        'function': get_manifest
+        }]
     httpd = MozHttpd(host=moznetwork.get_ip(), port=remote_port, log_requests=True,
-                     docroot=os.path.join(os.path.dirname(__file__), "..", "webharness"))
+                     docroot=os.path.join(os.path.dirname(__file__), "..", "webharness"),
+                     urlhandlers=handlers)
     httpd.start(block=False)
     #TODO: support test manifests
     test = HTMLTests(httpd, remote_info, log, options)

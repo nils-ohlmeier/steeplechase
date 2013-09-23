@@ -1,4 +1,0 @@
-{"tests": [
-    {"path": "sample.html"},
-    {"path": "webrtc_mochitest/test_peerConnection_basicAudio.html"}
-]}
