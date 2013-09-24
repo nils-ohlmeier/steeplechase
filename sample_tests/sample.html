@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>sample test</title>
+<script src="/test.js"></script>
+<script>
+function run_test(is_initiator) {
+  ok(true, "sample test started");
+  if (is_initiator) {
+    send_message({"data": "sample data"});
+    ok(true, "sent message");
+    finish();
+  } else {
+    wait_for_message().then(function (message) {
+      is(message.data, "sample data", "got right message");
+      finish();
+    });
+  }
+}
+</script>
+</head>
+<body>
+<h1>Hello world</h1>
+</body>
+</html>
