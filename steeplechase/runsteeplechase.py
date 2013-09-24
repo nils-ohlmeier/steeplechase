@@ -2,6 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+from manifestparser import TestManifest
 from mozdevice import DeviceManagerSUT
 from optparse import OptionParser
 from mozprofile import FirefoxProfile, Profile, Preferences
@@ -12,6 +13,7 @@ from Queue import Queue
 
 import json
 import mozfile
+import mozinfo
 import mozlog
 import moznetwork
 import os
@@ -30,6 +32,9 @@ class Options(OptionParser):
         self.add_option("--binary",
                         action="store", type="string", dest="binary",
                         help="path to application (required)")
+        self.add_option("--html-manifest",
+                        action="store", type="string", dest="html_manifest",
+                        help="Manifest of HTML tests to run")
         self.add_option("--specialpowers-path",
                         action="store", type="string", dest="specialpowers",
                         help="path to specialpowers extension (required)")
@@ -192,7 +197,7 @@ class HTMLTests(object):
 def main(args):
     parser = Options()
     options, args = parser.parse_args()
-    if not options.binary or not options.specialpowers or not options.host1 or not options.host2 or not options.signalling_server:
+    if not options.html_manifest or not options.binary or not options.specialpowers or not options.host1 or not options.host2 or not options.signalling_server:
         parser.print_usage()
         return 2
 
@@ -228,35 +233,37 @@ def main(args):
             dm.pushDir(os.path.dirname(app_path), remote_app_dir)
         info['remote_app_path'] = remote_app_dir + "/" + os.path.basename(app_path)
 
-    result = True
-    #TODO: only start httpd if we have HTML tests
-    remote_port = 0
-    if options.remote_webserver:
-        result = re.search(':(\d+)', options.remote_webserver)
-        if result:
-            remote_port = int(result.groups()[0])
+    pass_count, fail_count = 0, 0
+    if options.html_manifest:
+        manifest = TestManifest(strict=False)
+        manifest.read(options.html_manifest)
+        manifest_data = {"tests": [{"path": t["relpath"]} for t in manifest.active_tests(disabled=False, **mozinfo.info)]}
 
-    @json_response
-    def get_manifest(req):
-        #TODO: parse manifest, use contents here
-        return (200,
-                {"tests": [
-                    {"path": "sample.html"},
-                    {"path": "webrtc_mochitest/test_peerConnection_basicAudio.html"}
-                    ]})
-    handlers = [{
-        'method': 'GET',
-        'path': '/manifest.json',
-        'function': get_manifest
-        }]
-    httpd = MozHttpd(host=moznetwork.get_ip(), port=remote_port, log_requests=True,
-                     docroot=os.path.join(os.path.dirname(__file__), "..", "webharness"),
-                     urlhandlers=handlers)
-    httpd.start(block=False)
-    #TODO: support test manifests
-    test = HTMLTests(httpd, remote_info, log, options)
-    pass_count, fail_count = test.run()
-    httpd.stop()
+        remote_port = 0
+        if options.remote_webserver:
+            result = re.search(':(\d+)', options.remote_webserver)
+            if result:
+                remote_port = int(result.groups()[0])
+
+
+        @json_response
+        def get_manifest(req):
+            return (200, manifest_data)
+        handlers = [{
+            'method': 'GET',
+            'path': '/manifest.json',
+            'function': get_manifest
+            }]
+        httpd = MozHttpd(host=moznetwork.get_ip(), port=remote_port, log_requests=True,
+                         docroot=os.path.join(os.path.dirname(__file__), "..", "webharness"),
+                         urlhandlers=handlers,
+                         path_mappings={"/tests": os.path.dirname(options.html_manifest)})
+        httpd.start(block=False)
+        test = HTMLTests(httpd, remote_info, log, options)
+        html_pass_count, html_fail_count = test.run()
+        pass_count += html_pass_count
+        fail_count += html_fail_count
+        httpd.stop()
     log.info("Result summary:")
     log.info("Passed: %d" % pass_count)
     log.info("Failed: %d" % fail_count)
