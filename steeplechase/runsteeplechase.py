@@ -88,6 +88,8 @@ class RunThread(threading.Thread):
 
     def run(self):
         dm, cmd, env, cond, results = self.args
+        result = None
+        output = None
         try:
             output = dm.shellCheckOutput(cmd, env=env)
             result = get_results(output)
@@ -138,13 +140,13 @@ class HTMLTests(object):
         for info in self.remote_info:
             with mozfile.TemporaryDirectory() as profile_path:
                 # Create and push profile
-                print "Writing profile..."
+                print "Writing profile for %s..." % info['name']
                 prefs["steeplechase.is_initiator"] = info['is_initiator']
                 profile = FirefoxProfile(profile=profile_path,
                                          preferences=prefs,
                                          addons=[specialpowers_path],
                                          locations=locations)
-                print "Pushing profile..."
+                print "Pushing profile to %s..." % info['name']
                 remote_profile_path = os.path.join(info['test_root'], "profile")
                 info['dm'].mkDir(remote_profile_path)
                 info['dm'].pushDir(profile_path, remote_profile_path)
@@ -229,9 +231,13 @@ def main(args):
         app_path = options.binary
         remote_app_dir = test_root + "/app"
         if options.setup:
+            log.info("Pushing app to %s...", info["name"])
             dm.mkDir(remote_app_dir)
             dm.pushDir(os.path.dirname(app_path), remote_app_dir)
         info['remote_app_path'] = remote_app_dir + "/" + os.path.basename(app_path)
+        if not options.setup and not dm.fileExists(info['remote_app_path']):
+            log.error("App does not exist on %s, don't use --noSetup", info['name'])
+            return 2
 
     pass_count, fail_count = 0, 0
     if options.html_manifest:
