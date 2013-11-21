@@ -139,7 +139,13 @@ function run_next_test() {
   }
 
   var path = tests[current_test].path;
-  current_window = window.open("/tests/" + path);
+  try {
+    current_window = window.open("/tests/" + path);
+  } catch(ex) {
+    harness_error(ex);
+    return;
+  }
+  current_window.addEventListener("error", harness_error);
   current_window.addEventListener("load", function() {
     dump("loaded\n");
     send_message({"action": "test_loaded", "test": path});
@@ -165,6 +171,7 @@ function harness_error(error) {
   dump(error.stack +"\n");
   finish();
 }
+addEventListener("error", harness_error);
 
 // Called by tests via test.js.
 function test_finished() {
