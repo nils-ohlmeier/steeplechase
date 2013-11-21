@@ -2,15 +2,18 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+from manifestparser import TestManifest
 from mozdevice import DeviceManagerSUT
 from optparse import OptionParser
 from mozprofile import FirefoxProfile, Profile, Preferences
 from mozprofile.permissions import ServerLocations
 from mozhttpd import MozHttpd
+from mozhttpd.handlers import json_response
 from Queue import Queue
 
 import json
 import mozfile
+import mozinfo
 import mozlog
 import moznetwork
 import os
@@ -29,6 +32,9 @@ class Options(OptionParser):
         self.add_option("--binary",
                         action="store", type="string", dest="binary",
                         help="path to application (required)")
+        self.add_option("--html-manifest",
+                        action="store", type="string", dest="html_manifest",
+                        help="Manifest of HTML tests to run")
         self.add_option("--specialpowers-path",
                         action="store", type="string", dest="specialpowers",
                         help="path to specialpowers extension (required)")
@@ -82,6 +88,8 @@ class RunThread(threading.Thread):
 
     def run(self):
         dm, cmd, env, cond, results = self.args
+        result = None
+        output = None
         try:
             output = dm.shellCheckOutput(cmd, env=env)
             result = get_results(output)
@@ -132,13 +140,13 @@ class HTMLTests(object):
         for info in self.remote_info:
             with mozfile.TemporaryDirectory() as profile_path:
                 # Create and push profile
-                print "Writing profile..."
+                print "Writing profile for %s..." % info['name']
                 prefs["steeplechase.is_initiator"] = info['is_initiator']
                 profile = FirefoxProfile(profile=profile_path,
                                          preferences=prefs,
                                          addons=[specialpowers_path],
                                          locations=locations)
-                print "Pushing profile..."
+                print "Pushing profile to %s..." % info['name']
                 remote_profile_path = os.path.join(info['test_root'], "profile")
                 info['dm'].mkDir(remote_profile_path)
                 info['dm'].pushDir(profile_path, remote_profile_path)
@@ -191,7 +199,7 @@ class HTMLTests(object):
 def main(args):
     parser = Options()
     options, args = parser.parse_args()
-    if not options.binary or not options.specialpowers or not options.host1 or not options.host2 or not options.signalling_server:
+    if not options.html_manifest or not options.binary or not options.specialpowers or not options.host1 or not options.host2 or not options.signalling_server:
         parser.print_usage()
         return 2
 
@@ -207,8 +215,16 @@ def main(args):
 
     log = mozlog.getLogger('steeplechase')
     log.setLevel(mozlog.DEBUG)
-    dm1 = DeviceManagerSUT(options.host1)
-    dm2 = DeviceManagerSUT(options.host2)
+    if ':' in options.host1:
+        host, port = options.host1.split(':')
+        dm1 = DeviceManagerSUT(host, port)
+    else:
+        dm1 = DeviceManagerSUT(options.host1)
+    if ':' in options.host2:
+        host, port = options.host2.split(':')
+        dm2 = DeviceManagerSUT(host, port)
+    else:
+        dm2 = DeviceManagerSUT(options.host2)
     remote_info = [{'dm': dm1, 'is_initiator': True, 'name': 'Client 1'},
                    {'dm': dm2, 'is_initiator': False, 'name': 'Client 2'}]
     # first, push app
@@ -223,24 +239,45 @@ def main(args):
         app_path = options.binary
         remote_app_dir = test_root + "/app"
         if options.setup:
+            log.info("Pushing app to %s...", info["name"])
             dm.mkDir(remote_app_dir)
-            dm.pushDir(os.path.dirname(app_path), remote_app_dir)
+            dm.pushDir(os.path.dirname(app_path), remote_app_dir, timeout=3600)
         info['remote_app_path'] = remote_app_dir + "/" + os.path.basename(app_path)
+        if not options.setup and not dm.fileExists(info['remote_app_path']):
+            log.error("App does not exist on %s, don't use --noSetup", info['name'])
+            return 2
 
-    result = True
-    #TODO: only start httpd if we have HTML tests
-    remote_port = 0
-    if options.remote_webserver:
-        result = re.search(':(\d+)', options.remote_webserver)
-        if result:
-            remote_port = int(result.groups()[0])
-    httpd = MozHttpd(host=moznetwork.get_ip(), port=remote_port, log_requests=True,
-                     docroot=os.path.join(os.path.dirname(__file__), "..", "webharness"))
-    httpd.start(block=False)
-    #TODO: support test manifests
-    test = HTMLTests(httpd, remote_info, log, options)
-    pass_count, fail_count = test.run()
-    httpd.stop()
+    pass_count, fail_count = 0, 0
+    if options.html_manifest:
+        manifest = TestManifest(strict=False)
+        manifest.read(options.html_manifest)
+        manifest_data = {"tests": [{"path": t["relpath"]} for t in manifest.active_tests(disabled=False, **mozinfo.info)]}
+
+        remote_port = 0
+        if options.remote_webserver:
+            result = re.search(':(\d+)', options.remote_webserver)
+            if result:
+                remote_port = int(result.groups()[0])
+
+
+        @json_response
+        def get_manifest(req):
+            return (200, manifest_data)
+        handlers = [{
+            'method': 'GET',
+            'path': '/manifest.json',
+            'function': get_manifest
+            }]
+        httpd = MozHttpd(host=moznetwork.get_ip(), port=remote_port, log_requests=True,
+                         docroot=os.path.join(os.path.dirname(__file__), "..", "webharness"),
+                         urlhandlers=handlers,
+                         path_mappings={"/tests": os.path.dirname(options.html_manifest)})
+        httpd.start(block=False)
+        test = HTMLTests(httpd, remote_info, log, options)
+        html_pass_count, html_fail_count = test.run()
+        pass_count += html_pass_count
+        fail_count += html_fail_count
+        httpd.stop()
     log.info("Result summary:")
     log.info("Passed: %d" % pass_count)
     log.info("Failed: %d" % fail_count)
