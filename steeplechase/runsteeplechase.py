@@ -241,7 +241,7 @@ def main(args):
         if options.setup:
             log.info("Pushing app to %s...", info["name"])
             dm.mkDir(remote_app_dir)
-            dm.pushDir(os.path.dirname(app_path), remote_app_dir, timeout=3600)
+            dm.pushDir(os.path.dirname(app_path), remote_app_dir)
         info['remote_app_path'] = remote_app_dir + "/" + os.path.basename(app_path)
         if not options.setup and not dm.fileExists(info['remote_app_path']):
             log.error("App does not exist on %s, don't use --noSetup", info['name'])
