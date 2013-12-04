@@ -215,8 +215,16 @@ def main(args):
 
     log = mozlog.getLogger('steeplechase')
     log.setLevel(mozlog.DEBUG)
-    dm1 = DeviceManagerSUT(options.host1)
-    dm2 = DeviceManagerSUT(options.host2)
+    if ':' in options.host1:
+        host, port = options.host1.split(':')
+        dm1 = DeviceManagerSUT(host, port)
+    else:
+        dm1 = DeviceManagerSUT(options.host1)
+    if ':' in options.host2:
+        host, port = options.host2.split(':')
+        dm2 = DeviceManagerSUT(host, port)
+    else:
+        dm2 = DeviceManagerSUT(options.host2)
     remote_info = [{'dm': dm1, 'is_initiator': True, 'name': 'Client 1'},
                    {'dm': dm2, 'is_initiator': False, 'name': 'Client 2'}]
     # first, push app
