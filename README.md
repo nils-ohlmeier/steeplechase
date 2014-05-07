@@ -21,9 +21,9 @@ Running Steeplechase tests requires a Firefox binary as well as some supporting 
 
 Download and unpack the Firefox build and the test package on the controller machine. Assuming you've unpacked the Firefox build to /tmp/firefox and the tests to /tmp/test-package, to run tests, execute:
 
-    python steeplechase/runsteeplechase.py --binary=/tmp/firefox/firefox --specialpowers-path=/tmp/test-package/steeplechase/specialpowers --prefs-file=/tmp/test-package/steeplechase/prefs_general.js --host1=<client 1 address> --host2=<client 2 address> --signalling-server=http://<signalling server address:port>/ /tmp/test-package/steeplechase/tests/steeplechase.ini
+    python steeplechase/runsteeplechase.py --binary=/tmp/firefox/firefox --specialpowers-path=/tmp/test-package/steeplechase/specialpowers --prefs-file=/tmp/test-package/steeplechase/prefs_general.js --host1=<client 1 address> --host2=<client 2 address> --signalling-server=http://<signalling server address:port>/ --html-manifest=/tmp/test-package/steeplechase/tests/steeplechase.ini
 
-`--host1` and `--host2` in this commandline should specify the IP address (and port if necessary) of the client machines running Negatus. `--signalling-server` should specify the full URL of the signalling server wherever it is running. The final argument is the test manifest containing the list of tests to use. You can use the manifest from the Firefox test package, or run the tests contained in the `sample_tests` directory in this repository.
+`--host1` and `--host2` in this commandline should specify the IP address (and port if necessary) of the client machines running Negatus. `--signalling-server` should specify the full URL of the signalling server wherever it is running. The `--html-manifest` argument specifies the test manifest containing the list of tests to use. You can use the manifest from the Firefox test package, or run the tests contained in the `sample_tests` directory in this repository.
 
 [WebRTC]: http://www.webrtc.org/
 [Negatus]: https://github.com/mozilla/Negatus
