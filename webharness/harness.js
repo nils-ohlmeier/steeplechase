@@ -168,7 +168,8 @@ function run_next_test() {
 
 function harness_error(error) {
   log_result(false, error.message, "harness");
-  dump(error.stack +"\n");
+  var stack = error.stack || error.error || new Error().stack;
+  dump(stack +"\n");
   finish();
 }
 addEventListener("error", harness_error);
@@ -177,7 +178,7 @@ addEventListener("error", harness_error);
 function test_finished() {
   current_window.close();
   current_window = null;
-  run_next_test();
+  setTimeout(run_next_test, 0);
 }
 
 function finish() {
