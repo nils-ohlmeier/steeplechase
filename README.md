@@ -25,6 +25,8 @@ Download and unpack the Firefox build and the test package on the controller mac
 
 `--host1` and `--host2` in this commandline should specify the IP address (and port if necessary) of the client machines running Negatus. `--signalling-server` should specify the full URL of the signalling server wherever it is running. The `--html-manifest` argument specifies the test manifest containing the list of tests to use. You can use the manifest from the Firefox test package, or run the tests contained in the `sample_tests` directory in this repository.
 
+When re-running tests with the same binary you can use the `--noSetup` option to speed up the process, it will skip copying the Firefox binaries to each client. (You must have already done this once in order for this to work.)
+
 [WebRTC]: http://www.webrtc.org/
 [Negatus]: https://github.com/mozilla/Negatus
 [signalling server]: https://github.com/luser/simplesignalling
