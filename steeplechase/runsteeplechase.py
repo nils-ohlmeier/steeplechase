@@ -60,6 +60,9 @@ class Options(OptionParser):
         self.add_option("--x-display",
                         action="store", type="string", dest="remote_xdisplay",
                         default=":0", help="x display to use on remote system")
+        self.add_option("--save-logs-to",
+                        action="store", type="string", dest="log_dest",
+                        help="save client logs to this directory")
 
         self.set_usage(usage)
 
@@ -186,8 +189,12 @@ class HTMLTests(object):
                 self.log.error("Error in %s" % thread.name)
             threads.remove(thread)
         self.log.info("All clients finished")
-        if fail_count:
-            for info in self.remote_info:
+        for info in self.remote_info:
+            if self.options.log_dest:
+                with open(os.path.join(self.options.log_dest,
+                                       "%s.log" % info['name']), "wb") as f:
+                    f.write(outputs[info['name']])
+            if fail_count:
                 self.log.info("Log output for %s:", info["name"])
                 self.log.info(">>>>>>>")
                 for line in outputs[info['name']].splitlines():
