@@ -37,7 +37,7 @@ function load_script(script) {
     deferred.resolve(s);
   };
   s.onerror = function() {
-    deferred.reject(new Error("Error loading socket.io.js"));
+    deferred.reject(new Error("Error loading: " + script));
   };
   document.head.appendChild(s);
   return deferred.promise;
