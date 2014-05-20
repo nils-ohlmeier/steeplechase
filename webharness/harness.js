@@ -37,7 +37,7 @@ function load_script(script) {
     deferred.resolve(s);
   };
   s.onerror = function() {
-    deferred.reject(new Error("Error loading socket.io.js"));
+    deferred.reject(new Error("Error loading: " + script));
   };
   document.head.appendChild(s);
   return deferred.promise;
@@ -84,6 +84,9 @@ function send_message(data) {
 
 function connect_socket() {
   var server = SpecialPowers.getCharPref("steeplechase.signalling_server");
+  if (server.substr(server.length - 1) != "/") {
+    server += "/";
+  }
   var room = SpecialPowers.getCharPref("steeplechase.signalling_room");
   var script = server + "socket.io/socket.io.js";
   return load_script(script).then(function() {
