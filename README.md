@@ -27,6 +27,8 @@ Download and unpack the Firefox build and the test package on the controller mac
 
 When re-running tests with the same binary you can use the `--noSetup` option to speed up the process, it will skip copying the Firefox binaries to each client. (You must have already done this once in order for this to work.)
 
+If you would like to use a different Firefox binary for each client machine you may pass `--binary2` to specify a second binary. The argument to `--binary` will be run on host 1, and the argument to `--binary2` will be run on host 2.
+
 Writing Steeplechase tests
 ==========================
 

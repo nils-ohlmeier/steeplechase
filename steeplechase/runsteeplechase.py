@@ -32,6 +32,9 @@ class Options(OptionParser):
         self.add_option("--binary",
                         action="store", type="string", dest="binary",
                         help="path to application (required)")
+        self.add_option("--binary2",
+                        action="store", type="string", dest="binary2",
+                        help="path to application for client 2. defaults to BINARY")
         self.add_option("--html-manifest",
                         action="store", type="string", dest="html_manifest",
                         help="Manifest of HTML tests to run")
@@ -213,6 +216,11 @@ def main(args):
     if not os.path.isfile(options.binary):
         parser.error("Binary %s does not exist" % options.binary)
         return 2
+    if not options.binary2:
+        options.binary2 = options.binary
+    if not os.path.isfile(options.binary2):
+        parser.error("Binary %s does not exist" % options.binary2)
+        return 2
     if not os.path.isdir(options.specialpowers):
         parser.error("SpecialPowers directory %s does not exist" % options.specialpowers)
         return 2
@@ -232,8 +240,14 @@ def main(args):
         dm2 = DeviceManagerSUT(host, port)
     else:
         dm2 = DeviceManagerSUT(options.host2)
-    remote_info = [{'dm': dm1, 'is_initiator': True, 'name': 'Client 1'},
-                   {'dm': dm2, 'is_initiator': False, 'name': 'Client 2'}]
+    remote_info = [{'dm': dm1,
+                    'binary': options.binary,
+                    'is_initiator': True,
+                    'name': 'Client 1'},
+                   {'dm': dm2,
+                    'binary': options.binary2,
+                    'is_initiator': False,
+                    'name': 'Client 2'}]
     # first, push app
     for info in remote_info:
         dm = info['dm']
@@ -243,7 +257,7 @@ def main(args):
                 dm.removeDir(test_root)
             dm.mkDir(test_root)
         info['test_root'] = test_root
-        app_path = options.binary
+        app_path = info['binary']
         remote_app_dir = test_root + "/app"
         if options.setup:
             log.info("Pushing app to %s...", info["name"])
