@@ -15,6 +15,10 @@ function isnot(a, b, message) {
   ok(a != b, message);
 }
 
+function todo(condition, message) {
+  // Just ignore these.
+}
+
 function finish() {
   window.opener.test_finished();
 }
