@@ -227,6 +227,9 @@ def main(args):
     if options.prefs and not os.path.isfile(options.prefs):
         parser.error("Prefs file %s does not exist" % options.prefs)
         return 2
+    if options.log_dest and not os.path.isdir(options.log_dest):
+        parser.error("Log directory %s does not exist" % options.log_dest)
+        return 2
 
     log = mozlog.getLogger('steeplechase')
     log.setLevel(mozlog.DEBUG)
