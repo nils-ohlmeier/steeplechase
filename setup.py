@@ -20,6 +20,7 @@ dependencies = ['mozhttpd',
                 'mozprofile',
                 'mozprocess',
                 'mozrunner',
+                'mozdevice>=0.40',
                ]
 
 setup(name='steeplechase',
