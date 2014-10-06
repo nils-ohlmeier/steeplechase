@@ -3,7 +3,7 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from manifestparser import TestManifest
-from mozdevice import DeviceManagerSUT
+from mozdevice import DeviceManagerSUT, DMError
 from optparse import OptionParser
 from mozprofile import FirefoxProfile, Profile, Preferences
 from mozprofile.permissions import ServerLocations
@@ -99,6 +99,9 @@ class RunThread(threading.Thread):
         try:
             output = dm.shellCheckOutput(cmd, env=env)
             result = get_results(output)
+        except DMError as e:
+            output = "Error running build: " + e.msg
+            result = 0, 1
         finally:
             #TODO: actual result
             cond.acquire()
