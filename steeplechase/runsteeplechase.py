@@ -216,12 +216,12 @@ class Dmg(Package):
         # turns out to be a problem in practice, we need to use the install script in the build
         # directory of mozilla-central.
 
-        umount_cmd = ['umount', '/Volumes/Steeplechase']
-        self._log.debug("Running %s on remote host.." % umount_cmd)
+        detach_cmd = ['hdiutil', 'detach', '/Volumes/Steeplechase']
+        self._log.debug("Running %s on remote host.." % detach_cmd)
         try:
-            output = self._dm.shellCheckOutput(umount_cmd, env=None)
+            output = self._dm.shellCheckOutput(detach_cmd, env=None)
         except Exception as ex:
-            self._log.debug("EXPECTED: umount failed with %s" % ex)
+            self._log.debug("EXPECTED: detach failed with %s" % ex)
 
         cmd = ['hdiutil', 'attach', '-quiet', '-mountpoint', '/Volumes/Steeplechase', self.remote_archive_name()]
         self._log.debug("Running %s on remote host.." % cmd)
@@ -233,8 +233,8 @@ class Dmg(Package):
         cmd = ['cp', '-r', '/Volumes/Steeplechase/*.app', posixpath.join(self._remote_path, 'firefox.app')]
         self._log.debug("Running %s on remote host.." % cmd)
         output = self._dm.shellCheckOutput(cmd, env=None)
-        self._log.debug("Running %s on remote host.." % umount_cmd)
-        output = self._dm.shellCheckOutput(umount_cmd, env=None)
+        self._log.debug("Running %s on remote host.." % detach_cmd)
+        output = self._dm.shellCheckOutput(detach_cmd, env=None)
 
     def path_to_launch(self):
         return posixpath.join(self._remote_path, 'firefox.app', 'Contents', 'MacOS', 'firefox')
