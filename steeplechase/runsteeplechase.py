@@ -240,17 +240,17 @@ class Dmg(Package):
     def path_to_launch(self):
         return posixpath.join(self._remote_path, 'firefox.app', 'Contents', 'MacOS', 'firefox')
 
-def generate_package_asset(path, log, dm):
+def generate_package_asset(path, log, dm, name):
     """Factory method to return an asset object to push and unpack the object to the client."""
 
     asset = None
     base, ext = os.path.splitext(path)
     if path.endswith('.zip'):
-        asset = Zip(path, log, dm)
+        asset = Zip(path, log, dm, name)
     elif path.endswith('.dmg'):
-        asset = Dmg(path, log, dm)
+        asset = Dmg(path, log, dm, name)
     elif path.endswith('.tar.bz2'):
-        asset = TarBz2(path, log, dm)
+        asset = TarBz2(path, log, dm, name)
     else:
         raise "generate_packages_asset(%s) called with unknown extension." % path
     return asset
@@ -451,7 +451,7 @@ def main(args):
         if info['binary']:
             asset = Binary(path=info['binary'], log=log, dm=info['dm'], name=info['name'])
         else:
-            asset = generate_package_asset(path=info['package'], log=log, dm=info['dm'])
+            asset = generate_package_asset(path=info['package'], log=log, dm=info['dm'], name=info['name'])
 
         if options.setup:
             asset.setup_test_root()
