@@ -120,11 +120,12 @@ class RunThread(threading.Thread):
 class ApplicationAsset(object):
     """A class for handling the binaries or packages to be installed and run by steeplechase"""
 
-    def __init__(self, path, log, dm):
+    def __init__(self, path, log, dm, name):
         self._path = path
         self._log = log
         self._dm = dm
-        self._test_root = posixpath.join(dm.getDeviceRoot(), "steeplechase")
+        self._name = name
+        self._test_root = posixpath.join(dm.getDeviceRoot(), "steeplechase-" + name)
         self._remote_path = posixpath.join(self._test_root, "app")
 
     def remote_path(self):
@@ -437,18 +438,18 @@ def main(args):
                     'binary': package_options.binary,
                     'package': package_options.package,
                     'is_initiator': True,
-                    'name': 'Client 1'},
+                    'name': 'Client1'},
                    {'dm': dm2,
                     'binary': package_options.binary2,
                     'package': package_options.package2,
                     'is_initiator': False,
-                    'name': 'Client 2'}]
+                    'name': 'Client2'}]
     # first, push app
     for info in remote_info:
         dm = info['dm']
 
         if info['binary']:
-            asset = Binary(path=info['binary'], log=log, dm=info['dm'])
+            asset = Binary(path=info['binary'], log=log, dm=info['dm'], name=info['name'])
         else:
             asset = generate_package_asset(path=info['package'], log=log, dm=info['dm'])
 
