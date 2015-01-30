@@ -134,6 +134,11 @@ function run_tests(results) {
   run_next_test();
 }
 
+function test_error(errorMsg, url, lineNumber) {
+  log_result(false, errorMsg + " @" + url + ":" + lineNumber, tests[current_test].path);
+  finish();
+}
+
 function run_next_test() {
   ++current_test;
   if (current_test >= tests.length) {
@@ -148,7 +153,7 @@ function run_next_test() {
     harness_error(ex);
     return;
   }
-  current_window.addEventListener("error", harness_error);
+  current_window.onerror = test_error;
   current_window.addEventListener("load", function() {
     dump("loaded " + path + "\n");
     send_message({"action": "test_loaded", "test": path});
@@ -170,7 +175,7 @@ function run_next_test() {
 }
 
 function harness_error(error) {
-  log_result(false, error.message, "harness");
+  log_result(false, error.message, "harness.js");
   var stack = error.stack || error.error || new Error().stack;
   dump(stack +"\n");
   finish();
