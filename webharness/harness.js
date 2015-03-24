@@ -165,7 +165,7 @@ function run_next_test() {
         return;
       }
       if (m.test != path) {
-        harness_error(new Error("Wrong test loaded on other side: " + m.test));
+        harness_error(new Error("Wrong test loaded on other side: " + JSON.stringify(m.test)));
         return;
       }
       current_window.run_test(is_initiator);
