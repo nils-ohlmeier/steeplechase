@@ -3,44 +3,44 @@ var current_test = -1;
 var current_window = null;
 var socket;
 var socket_messages = [];
-var socket_message_deferreds = [];
+var socket_message_promises = [];
 var is_initiator = SpecialPowers.getBoolPref("steeplechase.is_initiator");
 
 function fetch_manifest() {
-  var deferred = Q.defer();
-  // Load test manifest
-  var req = new XMLHttpRequest();
-  req.open("GET", "/manifest.json", true);
-  req.responseType = "json";
-  req.overrideMimeType("application/json");
-  req.onload = function() {
-    if (req.readyState == 4) {
-      if (req.status == 200) {
-        deferred.resolve(req.response);
-      } else {
-        deferred.reject(new Error("Error fetching test manifest"));
+  return new Promise((resolve, reject) => {
+    // Load test manifest
+    var req = new XMLHttpRequest();
+    req.open("GET", "/manifest.json", true);
+    req.responseType = "json";
+    req.overrideMimeType("application/json");
+    req.onload = function() {
+      if (req.readyState == 4) {
+        if (req.status == 200) {
+          resolve(req.response);
+        } else {
+          reject(new Error("Error fetching test manifest"));
+        }
       }
-    }
-  };
-  req.onerror = function() {
-    deferred.reject(new Error("Error fetching test manifest"));
-  };
-  req.send(null);
-  return deferred.promise;
+    };
+    req.onerror = function() {
+      reject(new Error("Error fetching test manifest"));
+    };
+    req.send(null);
+  });
 }
 
 function load_script(script) {
-  var deferred = Q.defer();
-  var s = document.createElement("script");
-  s.src = script;
-  s.onload = function() {
-    deferred.resolve(s);
-  };
-  s.onerror = function() {
-    deferred.reject(new Error("Error loading: " + script));
-  };
-  document.head.appendChild(s);
-  return deferred.promise;
+  return new Promise((resolve, reject) => {
+    var s = document.createElement("script");
+    s.src = script;
+    s.onload = function() {
+      resolve(s);
+    };
+    s.onerror = function() {
+      reject(new Error("Error loading: " + script));
+    };
+    document.head.appendChild(s);
+  });
 }
 
 /*
@@ -51,9 +51,9 @@ function load_script(script) {
  */
 function socket_message(data) {
   var message = JSON.parse(data);
-  if (socket_message_deferreds.length > 0) {
-    var d = socket_message_deferreds.shift();
-    d.resolve(message);
+  if (socket_message_promises.length > 0) {
+    var res = socket_message_promises.shift();
+    res(message);
   } else {
     socket_messages.push(message);
   }
@@ -66,13 +66,13 @@ function socket_message(data) {
  * waits for socket_message to receive one.
  */
 function wait_for_message() {
-  var deferred = Q.defer();
-  if (socket_messages.length > 0) {
-    deferred.resolve(socket_messages.shift());
-  } else {
-    socket_message_deferreds.push(deferred);
-  }
-  return deferred.promise;
+  return new Promise(resolve => {
+    if (socket_messages.length > 0) {
+      resolve(socket_messages.shift());
+    } else {
+      socket_message_promises.push(resolve);
+    }
+  });
 }
 
 /*
@@ -90,41 +90,41 @@ function connect_socket() {
   var room = SpecialPowers.getCharPref("steeplechase.signalling_room");
   var script = server + "socket.io/socket.io.js";
   return load_script(script).then(function() {
-    var deferred = Q.defer();
-    socket = io.connect(server + "?room=" + room);
-    socket.on("connect", function() {
-      socket.on("message", socket_message);
-      deferred.resolve(socket);
+    return new Promise((resolve, reject) => {
+      socket = io.connect(server + "?room=" + room);
+      socket.on("connect", function() {
+        socket.on("message", socket_message);
+        resolve(socket);
+      });
+      socket.on("error", function() {
+        reject(new Error("socket.io error"));
+      });
+      socket.on("connect_failed", function() {
+        reject(new Error("socket failed to connect"));
+      });
     });
-    socket.on("error", function() {
-      deferred.reject(new Error("socket.io error"));
-    });
-    socket.on("connect_failed", function() {
-      deferred.reject(new Error("socket failed to connect"));
-    });
-    return deferred;
   }).then(function () {
-    var deferred = Q.defer();
-    socket.once("numclients", function(data) {
-      if (data.clients == 2) {
-        // Other side is already there.
-        deferred.resolve(socket);
-      } else if (data.clients > 2) {
-        deferred.reject(new Error("Too many clients connected"));
-      } else {
-        // Just us, wait for the other side.
-        socket.once("client_joined", function() {
-          deferred.resolve(socket);
-        });
-      }
+    return new Promise((resolve, reject) => {
+      socket.once("numclients", function(data) {
+        if (data.clients == 2) {
+          // Other side is already there.
+          resolve(socket);
+        } else if (data.clients > 2) {
+          reject(new Error("Too many clients connected"));
+        } else {
+          // Just us, wait for the other side.
+          socket.once("client_joined", function() {
+            resolve(socket);
+          });
+        }
+      });
     });
-    return deferred.promise;
   });
 }
 
-Q.all([fetch_manifest(),
-       connect_socket()]).then(run_tests,
-                               harness_error);
+Promise.all([fetch_manifest(),
+             connect_socket()]).then(run_tests,
+                                     harness_error);
 
 function run_tests(results) {
   var manifest = results[0];
