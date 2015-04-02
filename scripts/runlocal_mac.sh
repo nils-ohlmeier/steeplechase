@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#set -x
+set -x
 
 print_help() {
   echo "The expected default repository layout is:"
@@ -90,10 +90,10 @@ if [ -z ${NEGATUS_HOME} ]; then
 fi
 
 rm -rf /tmp/tests
-mkdir -p /tmp/tests/steeplechase-Client1/app/
-ln -s ${MOZILLA_DIST}/bin /tmp/tests/steeplechase-Client1/app
-mkdir -p /tmp/tests/steeplechase-Client2/app/
-ln -s ${MOZILLA_DIST}/bin /tmp/tests/steeplechase-Client2/app
+mkdir -p /tmp/tests/steeplechase-Client1/
+ln -s ${MOZILLA_DIST}/NightlyDebug.app/Contents /tmp/tests/steeplechase-Client1/app
+mkdir -p /tmp/tests/steeplechase-Client2/
+ln -s ${MOZILLA_DIST}/NightlyDebug.app/Contents /tmp/tests/steeplechase-Client2/app
 
 cd ${SIMPLESIG_HOME}
 node server.js &
@@ -106,7 +106,7 @@ ${NEGATUS_HOME}/agent -p 20703 --heartbeat 20702 &
 NEGATUS_PID2=$!
 
 python ${STEEPLECHASE_HOME}/steeplechase/runsteeplechase.py \
-  --binary ${MOZILLA_DIST}/bin/firefox \
+  --binary ${MOZILLA_DIST}/NightlyDebug.app/Contents/MacOS/firefox \
   --specialpowers-path ${MOZILLA_DIST}/xpi-stage/specialpowers \
   --prefs-file ${MOZILLA_CENTRAL}/testing/profiles/prefs_general.js \
   --html-manifest ${MOZILLA_OBJ}/_tests/steeplechase/steeplechase.ini \
