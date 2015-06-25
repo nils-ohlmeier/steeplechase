@@ -395,7 +395,7 @@ def get_package_options(parser, options):
 
     if package_options.package2:
         if not os.path.isfile(package_options.package2):
-            parser.error("Package %s does not exist# % package_options.package2")
+            parser.error("Package %s does not exist." % package_options.package2)
             return None
 
     return package_options
