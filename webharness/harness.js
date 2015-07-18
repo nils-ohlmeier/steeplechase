@@ -195,6 +195,7 @@ function finish() {
 
 function log(message, test, extra) {
   //TODO: make this structured?
+  console.log(message);
   dump(message + "\n");
 }
 
